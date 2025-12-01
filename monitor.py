@@ -93,6 +93,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Check bot health\n"
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices\n"
+        "/95 - Find high conviction events (>94%)\n"
         "/help - Show all commands",
         parse_mode="Markdown"
     )
@@ -105,6 +106,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Check bot health & uptime\n"
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices & volume\n"
+        "/95 - Find high conviction events (>94% bid, >$1M liq)\n"
         "/help - Show this command list",
         parse_mode="Markdown"
     )
@@ -161,6 +163,79 @@ async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"❌ Could not fetch data for {slug}\n\n"
     
     await update.message.reply_text(message, parse_mode="Markdown")
+
+async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds events with >94% bid and >$1M liquidity."""
+    await update.message.reply_text("🔍 Scanning for high conviction events...")
+    
+    url = f"{POLYMARKET_API_URL}"
+    params = {
+        "limit": 50,
+        "active": "true",
+        "closed": "false",
+        "order": "liquidity",
+        "ascending": "false"
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        events = response.json()
+        
+        high_conviction_events = []
+        
+        for event in events:
+            markets = event.get('markets', [])
+            if not markets:
+                continue
+                
+            market = markets[0]
+            
+            # Check Liquidity > $1M
+            liquidity = float(market.get('liquidity', 0))
+            if liquidity < 1_000_000:
+                continue
+                
+            # Check Price > 94%
+            outcome_prices = market.get('outcomePrices', ['0', '0'])
+            if isinstance(outcome_prices, str):
+                try:
+                    import json
+                    outcome_prices = json.loads(outcome_prices)
+                except:
+                    outcome_prices = ['0', '0']
+            
+            if not isinstance(outcome_prices, list) or len(outcome_prices) < 1:
+                continue
+                
+            try:
+                yes_price = float(outcome_prices[0])
+            except:
+                continue
+                
+            if yes_price > 0.94:
+                high_conviction_events.append({
+                    "title": event.get('title'),
+                    "slug": event.get('slug'),
+                    "yes_price": yes_price,
+                    "liquidity": liquidity
+                })
+        
+        if not high_conviction_events:
+            await update.message.reply_text("No events found matching criteria (>94% bid, >$1M liquidity).")
+            return
+            
+        message = "🚀 **High Conviction Events (>94%)**\n\n"
+        for e in high_conviction_events:
+            message += f"**{e['title']}**\n"
+            message += f"Price: {e['yes_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+            message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+            
+        await update.message.reply_text(message, parse_mode="Markdown")
+        
+    except Exception as e:
+        logging.error(f"Error in /95 command: {e}")
+        await update.message.reply_text("❌ Failed to fetch events.")
 
 
 
@@ -229,6 +304,7 @@ def main():
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("latest", latest))
     application.add_handler(CommandHandler("tracking", tracking))
+    application.add_handler(CommandHandler("95", cmd_95))
 
 
     # Add Background Job
