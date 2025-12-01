@@ -149,8 +149,6 @@ async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"**{details['title']}**\n"
             message += f"Yes Price: {yes_price * 100:.1f}¢ (${yes_price:.3f})\n"
             message += f"Volume: ${volume:,.0f}\n"
-            message += f"Yes Price: {yes_price * 100:.1f}¢ (${yes_price:.3f})\n"
-            message += f"Volume: ${volume:,.0f}\n"
             
             # Use specific Predicts.guru links
             if slug == "trump-out-as-president-by-march-31":
