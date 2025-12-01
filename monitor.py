@@ -74,21 +74,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a welcome message."""
     await update.message.reply_text(
         "🤖 **Polymarket Monitor is Online!**\n\n"
-        "I will notify you when new markets are created.\n"
-        "Commands:\n"
-        "/status - Check if I'm running\n"
+        "I will notify you when new markets are created.\n\n"
+        "**Commands:**\n"
+        "/status - Check bot health\n"
         "/latest - Show the most recent market\n"
-        "/help - Show this message",
+        "/tracking - Check Trump event prices\n"
+        "/help - Show all commands",
         parse_mode="Markdown"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a help message."""
     await update.message.reply_text(
-        "**Available Commands:**\n"
-        "/status - Check bot health\n"
-        "/latest - Fetch the newest market manually\n"
-        "/help - Show available commands",
+        "**📋 All Available Commands:**\n\n"
+        "/start - Welcome message\n"
+        "/status - Check bot health & uptime\n"
+        "/latest - Show the most recent market\n"
+        "/tracking - Check Trump event prices & volume\n"
+        "/help - Show this command list",
         parse_mode="Markdown"
     )
 
@@ -119,9 +122,9 @@ async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Could not fetch latest event.")
 
-async def check_trump(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Manually check Trump event prices."""
-    message = "📊 **Trump Event Update**\n\n"
+async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check tracked Trump event prices and volume."""
+    message = "📊 **Tracked Events Update**\n\n"
     
     for slug in TARGET_EVENT_SLUGS:
         details = get_market_details(slug)
@@ -201,7 +204,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("latest", latest))
-    application.add_handler(CommandHandler("check_trump", check_trump))
+    application.add_handler(CommandHandler("tracking", tracking))
 
     # Add Background Job
     job_queue = application.job_queue
