@@ -231,7 +231,7 @@ def main():
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("latest", latest))
     application.add_handler(CommandHandler("tracking", tracking))
-    application.add_handler(CommandHandler("chart", chart))
+
 
     # Add Background Job
     job_queue = application.job_queue
