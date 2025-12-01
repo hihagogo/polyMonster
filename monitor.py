@@ -100,6 +100,15 @@ def get_token_id(slug):
         market = markets[0]
         clob_token_ids = market.get('clobTokenIds', [])
         
+        # Handle both string and list formats
+        if isinstance(clob_token_ids, str):
+            try:
+                import json
+                clob_token_ids = json.loads(clob_token_ids)
+            except:
+                logging.error(f"Failed to parse clobTokenIds: {clob_token_ids}")
+                return None
+        
         # Return first token ID (Yes token)
         if isinstance(clob_token_ids, list) and len(clob_token_ids) > 0:
             return clob_token_ids[0]
@@ -222,7 +231,8 @@ async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             message += f"**{details['title']}**\n"
             message += f"Yes Price: {yes_price:.1%}\n"
-            message += f"Volume: ${volume:,.0f}\n\n"
+            message += f"Volume: ${volume:,.0f}\n"
+            message += f"[View on Polymarket](https://polymarket.com/event/{slug})\n\n"
         else:
             message += f"❌ Could not fetch data for {slug}\n\n"
     
