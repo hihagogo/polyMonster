@@ -106,7 +106,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/status - Check bot health & uptime\n"
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices & volume\n"
-        "/95 - Find high conviction events (>94% bid, >$1M liq)\n"
+        "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/help - Show this command list",
         parse_mode="Markdown"
     )
@@ -165,7 +165,7 @@ async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode="Markdown")
 
 async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Finds events with >94% bid and >$1M liquidity."""
+    """Finds events with >94% bid and >$500k liquidity."""
     await update.message.reply_text("🔍 Scanning for high conviction events...")
     
     url = f"{POLYMARKET_API_URL}"
@@ -191,9 +191,9 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
             market = markets[0]
             
-            # Check Liquidity > $1M
+            # Check Liquidity > $500k
             liquidity = float(market.get('liquidity', 0))
-            if liquidity < 1_000_000:
+            if liquidity < 500_000:
                 continue
                 
             # Check Price > 94%
@@ -222,7 +222,7 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 })
         
         if not high_conviction_events:
-            await update.message.reply_text("No events found matching criteria (>94% bid, >$1M liquidity).")
+            await update.message.reply_text("No events found matching criteria (>94% bid, >$500k liquidity).")
             return
             
         message = "🚀 **High Conviction Events (>94%)**\n\n"
