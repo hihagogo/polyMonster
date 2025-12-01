@@ -60,9 +60,13 @@ def get_market_details(slug):
         # Get the first market (usually the main Yes/No market)
         market = markets[0]
         
+        # outcomePrices is a list like ['0.05', '0.95'], first is Yes price
+        outcome_prices = market.get('outcomePrices', ['0', '0'])
+        yes_price = outcome_prices[0] if isinstance(outcome_prices, list) else '0'
+        
         return {
             'title': title,
-            'yes_price': market.get('outcomePrices', ['0', '0'])[0],
+            'yes_price': yes_price,
             'volume': market.get('volume', '0'),
             'liquidity': market.get('liquidity', '0')
         }
