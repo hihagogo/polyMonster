@@ -13,6 +13,12 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 POLYMARKET_API_URL = "https://gamma-api.polymarket.com/events"
 
+# Target events to track daily
+TARGET_EVENT_SLUGS = [
+    "trump-out-as-president-by-march-31",
+    "trump-out-as-president-before-2027"
+]
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,6 +39,36 @@ def get_events(limit=10):
     except Exception as e:
         logging.error(f"Failed to fetch events: {e}")
         return []
+
+def get_market_details(slug):
+    """Fetches detailed market data for a specific event slug."""
+    try:
+        response = requests.get(f"{POLYMARKET_API_URL}?slug={slug}")
+        response.raise_for_status()
+        events = response.json()
+        
+        if not events or len(events) == 0:
+            return None
+            
+        event = events[0]
+        title = event.get('title', 'Unknown')
+        markets = event.get('markets', [])
+        
+        if not markets:
+            return None
+            
+        # Get the first market (usually the main Yes/No market)
+        market = markets[0]
+        
+        return {
+            'title': title,
+            'yes_price': market.get('outcomePrices', ['0', '0'])[0],
+            'volume': market.get('volume', '0'),
+            'liquidity': market.get('liquidity', '0')
+        }
+    except Exception as e:
+        logging.error(f"Failed to fetch market details for {slug}: {e}")
+        return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a welcome message."""
@@ -83,6 +119,24 @@ async def latest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Could not fetch latest event.")
 
+async def check_trump(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manually check Trump event prices."""
+    message = "📊 **Trump Event Update**\n\n"
+    
+    for slug in TARGET_EVENT_SLUGS:
+        details = get_market_details(slug)
+        if details:
+            yes_price = float(details['yes_price'])
+            volume = float(details['volume'])
+            
+            message += f"**{details['title']}**\n"
+            message += f"Yes Price: {yes_price:.1%}\n"
+            message += f"Volume: ${volume:,.0f}\n\n"
+        else:
+            message += f"❌ Could not fetch data for {slug}\n\n"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
 async def check_new_events(context: ContextTypes.DEFAULT_TYPE):
     """Background task to check for new events."""
     global last_check_time
@@ -108,6 +162,25 @@ async def check_new_events(context: ContextTypes.DEFAULT_TYPE):
             
             seen_ids.add(event_id)
 
+async def daily_market_update(context: ContextTypes.DEFAULT_TYPE):
+    """Sends daily update for tracked Trump events."""
+    message = "📊 **Daily Trump Event Update**\n\n"
+    
+    for slug in TARGET_EVENT_SLUGS:
+        details = get_market_details(slug)
+        if details:
+            yes_price = float(details['yes_price'])
+            volume = float(details['volume'])
+            
+            message += f"**{details['title']}**\n"
+            message += f"Yes Price: {yes_price:.1%}\n"
+            message += f"24h Volume: ${volume:,.0f}\n\n"
+        else:
+            message += f"❌ Could not fetch data for {slug}\n\n"
+    
+    if TELEGRAM_CHAT_ID:
+        await context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="Markdown")
+
 def main():
     """Start the bot."""
     if not TELEGRAM_BOT_TOKEN:
@@ -128,10 +201,16 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("latest", latest))
+    application.add_handler(CommandHandler("check_trump", check_trump))
 
     # Add Background Job
     job_queue = application.job_queue
     job_queue.run_repeating(check_new_events, interval=60, first=10)
+    
+    # Add Daily Trump Event Update (runs at 8:00 AM UTC)
+    import datetime
+    daily_time = datetime.time(hour=8, minute=0, tzinfo=datetime.timezone.utc)
+    job_queue.run_daily(daily_market_update, time=daily_time)
 
     # Run the bot
     print("Bot is starting...")
