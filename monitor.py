@@ -222,11 +222,15 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
             max_price = max(prices)
                 
             if max_price > 0.94:
+                # Get end date
+                end_date = market.get('endDateIso', 'N/A')
+                
                 high_conviction_events.append({
                     "title": event.get('title'),
                     "slug": event.get('slug'),
                     "max_price": max_price,
-                    "liquidity": liquidity
+                    "liquidity": liquidity,
+                    "end_date": end_date
                 })
         
         if not high_conviction_events:
@@ -237,6 +241,7 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for e in high_conviction_events:
             message += f"**{e['title']}**\n"
             message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+            message += f"End Date: {e['end_date']}\n"
             message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
             
         await update.message.reply_text(message, parse_mode="Markdown")
@@ -291,6 +296,91 @@ async def daily_market_update(context: ContextTypes.DEFAULT_TYPE):
     if TELEGRAM_CHAT_ID:
         await context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="Markdown")
 
+async def daily_95_report(context: ContextTypes.DEFAULT_TYPE):
+    """Sends daily report of high conviction events (>94% bid, >$500k liq)."""
+    url = f"{POLYMARKET_API_URL}"
+    params = {
+        "limit": 100,
+        "active": "true",
+        "closed": "false",
+        "order": "liquidity",
+        "ascending": "false"
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        events = response.json()
+        
+        high_conviction_events = []
+        
+        for event in events:
+            markets = event.get('markets', [])
+            if not markets:
+                continue
+                
+            market = markets[0]
+            
+            # Check Liquidity > $500k
+            liquidity = float(market.get('liquidity', 0))
+            if liquidity < 500_000:
+                continue
+                
+            # Check Price > 94% (any outcome)
+            outcome_prices = market.get('outcomePrices', ['0', '0'])
+            if isinstance(outcome_prices, str):
+                try:
+                    import json
+                    outcome_prices = json.loads(outcome_prices)
+                except:
+                    outcome_prices = ['0', '0']
+            
+            if not isinstance(outcome_prices, list) or len(outcome_prices) < 1:
+                continue
+            
+            # Convert all prices to floats and find the max
+            prices = []
+            for p in outcome_prices:
+                try:
+                    prices.append(float(p))
+                except:
+                    pass
+            
+            if not prices:
+                continue
+                
+            max_price = max(prices)
+                
+            if max_price > 0.94:
+                # Get end date
+                end_date = market.get('endDateIso', 'N/A')
+                
+                high_conviction_events.append({
+                    "title": event.get('title'),
+                    "slug": event.get('slug'),
+                    "max_price": max_price,
+                    "liquidity": liquidity,
+                    "end_date": end_date
+                })
+        
+        if not high_conviction_events:
+            message = "📊 **Daily High Conviction Report**\n\nNo events found matching criteria (>94% bid, >$500k liquidity)."
+        else:
+            message = "📊 **Daily High Conviction Report**\n\n"
+            for e in high_conviction_events:
+                message += f"**{e['title']}**\n"
+                message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+                message += f"End Date: {e['end_date']}\n"
+                message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+        
+        if TELEGRAM_CHAT_ID:
+            await context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode="Markdown")
+            
+    except Exception as e:
+        logging.error(f"Error in daily /95 report: {e}")
+        if TELEGRAM_CHAT_ID:
+            await context.bot.send_message(chat_id=TELEGRAM_CHAT_ID, text="❌ Failed to generate daily high conviction report.")
+
 def main():
     """Start the bot."""
     if not TELEGRAM_BOT_TOKEN:
@@ -323,6 +413,16 @@ def main():
     import datetime
     daily_time = datetime.time(hour=8, minute=0, tzinfo=datetime.timezone.utc)
     job_queue.run_daily(daily_market_update, time=daily_time)
+    
+    # Add /95 Report every 8 hours, first run at 6:15 PM Singapore time (10:15 AM UTC)
+    # Singapore is UTC+8, so 6:15 PM SGT = 10:15 AM UTC
+    # Calculate seconds until first run (10:15 AM UTC today or tomorrow)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    target_time = now.replace(hour=10, minute=15, second=0, microsecond=0)
+    if target_time <= now:
+        target_time += datetime.timedelta(days=1)
+    first_run_seconds = (target_time - now).total_seconds()
+    job_queue.run_repeating(daily_95_report, interval=28800, first=first_run_seconds)  # Every 8 hours (28800 seconds)
 
     # Run the bot
     print("Bot is starting...")
