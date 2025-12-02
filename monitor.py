@@ -170,7 +170,7 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     url = f"{POLYMARKET_API_URL}"
     params = {
-        "limit": 50,
+        "limit": 100,  # Increased from 50 to find more candidates
         "active": "true",
         "closed": "false",
         "order": "liquidity",
@@ -196,7 +196,7 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if liquidity < 500_000:
                 continue
                 
-            # Check Price > 94%
+            # Check Price > 94% (any outcome)
             outcome_prices = market.get('outcomePrices', ['0', '0'])
             if isinstance(outcome_prices, str):
                 try:
@@ -207,17 +207,25 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             if not isinstance(outcome_prices, list) or len(outcome_prices) < 1:
                 continue
-                
-            try:
-                yes_price = float(outcome_prices[0])
-            except:
+            
+            # Convert all prices to floats and find the max
+            prices = []
+            for p in outcome_prices:
+                try:
+                    prices.append(float(p))
+                except:
+                    pass
+            
+            if not prices:
                 continue
                 
-            if yes_price > 0.94:
+            max_price = max(prices)
+                
+            if max_price > 0.94:
                 high_conviction_events.append({
                     "title": event.get('title'),
                     "slug": event.get('slug'),
-                    "yes_price": yes_price,
+                    "max_price": max_price,
                     "liquidity": liquidity
                 })
         
@@ -228,7 +236,7 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = "🚀 **High Conviction Events (>94%)**\n\n"
         for e in high_conviction_events:
             message += f"**{e['title']}**\n"
-            message += f"Price: {e['yes_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+            message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
             message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
             
         await update.message.reply_text(message, parse_mode="Markdown")
