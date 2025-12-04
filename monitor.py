@@ -89,13 +89,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 **Polymarket Monitor is Online!**\n\n"
         "I will notify you when new markets are created.\n\n"
-        "**Commands:**\n"
-        "/status - Check bot health\n"
+        "**📋 Available Commands:**\n\n"
+        "/start - Welcome message\n"
+        "/help - Show this command list\n"
+        "/status - Check bot health & uptime\n"
         "/latest - Show the most recent market\n"
-        "/tracking - Check Trump event prices\n"
-        "/95 - Find high conviction events (>94%)\n"
-        "/95_1d - High conviction events ending within 24h\n"
-        "/help - Show all commands",
+        "/tracking - Check Trump event prices & volume\n"
+        "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
+        "/95_1d - High conviction events ending within 24 hours",
         parse_mode="Markdown"
     )
 
