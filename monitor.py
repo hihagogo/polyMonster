@@ -94,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices\n"
         "/95 - Find high conviction events (>94%)\n"
-        "/95+1d - High conviction events ending within 24h\n"
+        "/95_1d - High conviction events ending within 24h\n"
         "/help - Show all commands",
         parse_mode="Markdown"
     )
@@ -108,7 +108,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices & volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
-        "/95+1d - High conviction events ending within 24 hours\n"
+        "/95_1d - High conviction events ending within 24 hours\n"
         "/help - Show this command list",
         parse_mode="Markdown"
     )
@@ -457,7 +457,7 @@ def main():
     application.add_handler(CommandHandler("latest", latest))
     application.add_handler(CommandHandler("tracking", tracking))
     application.add_handler(CommandHandler("95", cmd_95))
-    application.add_handler(CommandHandler("95+1d", cmd_95_1d))
+    application.add_handler(CommandHandler("95_1d", cmd_95_1d))
 
 
     # Add Background Job
