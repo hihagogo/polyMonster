@@ -443,12 +443,21 @@ def main():
         return
 
     # Delete any existing webhook to prevent conflicts with polling
-    try:
-        delete_webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook"
-        response = requests.post(delete_webhook_url)
-        print(f"Webhook deletion response: {response.json()}")
-    except Exception as e:
-        print(f"Warning: Could not delete webhook: {e}")
+    # Try multiple times to ensure it's cleared
+    for attempt in range(3):
+        try:
+            delete_webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true"
+            response = requests.post(delete_webhook_url)
+            result = response.json()
+            print(f"Webhook deletion attempt {attempt + 1}: {result}")
+            if result.get('ok'):
+                break
+        except Exception as e:
+            print(f"Warning: Could not delete webhook (attempt {attempt + 1}): {e}")
+        
+        if attempt < 2:
+            import time
+            time.sleep(2)  # Wait before retry
 
     # Initialize seen_ids with current events so we don't spam on startup
     initial_events = get_events(limit=20)
