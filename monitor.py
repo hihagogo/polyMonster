@@ -92,9 +92,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "**📋 Available Commands:**\n\n"
         "/start - Welcome message\n"
         "/help - Show this command list\n"
-        "/status - Check bot health & uptime\n"
+        "/status - Check bot health and uptime\n"
         "/latest - Show the most recent market\n"
-        "/tracking - Check Trump event prices & volume\n"
+        "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours",
         parse_mode="Markdown"
@@ -105,9 +105,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "**📋 All Available Commands:**\n\n"
         "/start - Welcome message\n"
-        "/status - Check bot health & uptime\n"
+        "/status - Check bot health and uptime\n"
         "/latest - Show the most recent market\n"
-        "/tracking - Check Trump event prices & volume\n"
+        "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
         "/help - Show this command list",
