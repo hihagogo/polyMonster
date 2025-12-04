@@ -441,6 +441,14 @@ def main():
         print("Error: TELEGRAM_BOT_TOKEN not found.")
         return
 
+    # Delete any existing webhook to prevent conflicts with polling
+    try:
+        delete_webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook"
+        response = requests.post(delete_webhook_url)
+        print(f"Webhook deletion response: {response.json()}")
+    except Exception as e:
+        print(f"Warning: Could not delete webhook: {e}")
+
     # Initialize seen_ids with current events so we don't spam on startup
     initial_events = get_events(limit=20)
     for event in initial_events:
