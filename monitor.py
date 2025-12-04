@@ -497,9 +497,34 @@ def main():
     first_run_seconds = (target_time - now).total_seconds()
     job_queue.run_repeating(daily_95_report, interval=28800, first=first_run_seconds)  # Every 8 hours (28800 seconds)
 
-    # Run the bot
+    # Run the bot with retry logic for Telegram conflicts
     print("Bot is starting...")
-    application.run_polling()
+    
+    max_retries = 5
+    retry_delay = 5
+    
+    for retry in range(max_retries):
+        try:
+            print(f"Starting polling (attempt {retry + 1}/{max_retries})...")
+            application.run_polling(drop_pending_updates=True)
+            break  # If successful, exit loop
+        except Exception as e:
+            error_msg = str(e)
+            if "Conflict" in error_msg and retry < max_retries - 1:
+                print(f"Telegram conflict detected. Waiting {retry_delay} seconds before retry...")
+                import time
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                
+                # Try to delete webhook again
+                try:
+                    delete_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true"
+                    requests.post(delete_url)
+                except:
+                    pass
+            else:
+                print(f"Fatal error: {e}")
+                raise
 
 if __name__ == "__main__":
     main()
