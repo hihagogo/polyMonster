@@ -94,6 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices\n"
         "/95 - Find high conviction events (>94%)\n"
+        "/95+1d - High conviction events ending within 24h\n"
         "/help - Show all commands",
         parse_mode="Markdown"
     )
@@ -107,6 +108,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices & volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
+        "/95+1d - High conviction events ending within 24 hours\n"
         "/help - Show this command list",
         parse_mode="Markdown"
     )
@@ -164,13 +166,11 @@ async def tracking(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode="Markdown")
 
-async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Finds events with >94% bid and >$500k liquidity."""
-    await update.message.reply_text("🔍 Scanning for high conviction events...")
-    
+def get_high_conviction_events():
+    """Helper function to fetch high conviction events (>94% bid, >$500k liquidity)."""
     url = f"{POLYMARKET_API_URL}"
     params = {
-        "limit": 100,  # Increased from 50 to find more candidates
+        "limit": 100,
         "active": "true",
         "closed": "false",
         "order": "liquidity",
@@ -233,22 +233,76 @@ async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "end_date": end_date
                 })
         
-        if not high_conviction_events:
-            await update.message.reply_text("No events found matching criteria (>94% bid, >$500k liquidity).")
-            return
-            
-        message = "🚀 **High Conviction Events (>94%)**\n\n"
-        for e in high_conviction_events:
-            message += f"**{e['title']}**\n"
-            message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
-            message += f"End Date: {e['end_date']}\n"
-            message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
-            
-        await update.message.reply_text(message, parse_mode="Markdown")
+        return high_conviction_events
         
     except Exception as e:
-        logging.error(f"Error in /95 command: {e}")
+        logging.error(f"Error fetching high conviction events: {e}")
+        return None
+
+async def cmd_95(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds events with >94% bid and >$500k liquidity."""
+    await update.message.reply_text("🔍 Scanning for high conviction events...")
+    
+    high_conviction_events = get_high_conviction_events()
+    
+    if high_conviction_events is None:
         await update.message.reply_text("❌ Failed to fetch events.")
+        return
+        
+    if not high_conviction_events:
+        await update.message.reply_text("No events found matching criteria (>94% bid, >$500k liquidity).")
+        return
+        
+    message = "🚀 **High Conviction Events (>94%)**\n\n"
+    for e in high_conviction_events:
+        message += f"**{e['title']}**\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+        message += f"End Date: {e['end_date']}\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+        
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+async def cmd_95_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds high conviction events ending within 24 hours."""
+    await update.message.reply_text("🔍 Scanning for high conviction events ending soon...")
+    
+    high_conviction_events = get_high_conviction_events()
+    
+    if high_conviction_events is None:
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
+    
+    # Filter for events ending within 24 hours
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=24)
+    
+    filtered_events = []
+    for e in high_conviction_events:
+        end_date_str = e['end_date']
+        if end_date_str == 'N/A':
+            continue
+        
+        try:
+            # Parse the end date (format: YYYY-MM-DD)
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+            if now <= end_date <= cutoff:
+                filtered_events.append(e)
+        except:
+            continue
+    
+    if not filtered_events:
+        await update.message.reply_text("No events found ending within 24 hours (>94% bid, >$500k liquidity).")
+        return
+        
+    message = "⏰ **High Conviction Events Ending Within 24 Hours**\n\n"
+    for e in filtered_events:
+        message += f"**{e['title']}**\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+        message += f"End Date: {e['end_date']}\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+        
+    await update.message.reply_text(message, parse_mode="Markdown")
 
 
 
@@ -403,6 +457,7 @@ def main():
     application.add_handler(CommandHandler("latest", latest))
     application.add_handler(CommandHandler("tracking", tracking))
     application.add_handler(CommandHandler("95", cmd_95))
+    application.add_handler(CommandHandler("95+1d", cmd_95_1d))
 
 
     # Add Background Job
