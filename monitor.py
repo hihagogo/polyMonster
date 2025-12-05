@@ -96,7 +96,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/latest - Show the most recent market\n"
         "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
-        "/95_1d - High conviction events ending within 24 hours"
+        "/95_1d - High conviction events ending within 24 hours\n"
+        "/1d - All events ending within 24 hours"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,6 +110,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
+        "/1d - All events ending within 24 hours\n"
         "/help - Show this command list"
     )
 
@@ -303,6 +305,81 @@ async def cmd_95_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     await update.message.reply_text(message, parse_mode="Markdown")
 
+async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds all events ending within 24 hours."""
+    await update.message.reply_text("🔍 Scanning for events ending within 24 hours...")
+    
+    # Fetch events from Polymarket API
+    try:
+        url = "https://gamma-api.polymarket.com/events"
+        params = {
+            "limit": 100,
+            "active": "true"
+        }
+        response = requests.get(url, params=params)
+        events = response.json()
+    except Exception as e:
+        logging.error(f"Error fetching events: {e}")
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
+    
+    # Filter for events ending within 24 hours
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=24)
+    
+    filtered_events = []
+    for event in events:
+        try:
+            end_date_iso = event.get('endDateIso')
+            if not end_date_iso:
+                continue
+            
+            end_date = datetime.fromisoformat(end_date_iso.replace('Z', '+00:00'))
+            if end_date <= cutoff:
+                # Get liquidity
+                liquidity = float(event.get('liquidity', 0))
+                
+                # Get max price across all outcomes
+                outcome_prices = event.get('outcomePrices', '[]')
+                if isinstance(outcome_prices, str):
+                    import json
+                    outcome_prices = json.loads(outcome_prices)
+                
+                max_price = 0.0
+                if outcome_prices:
+                    max_price = max(float(p) for p in outcome_prices)
+                
+                filtered_events.append({
+                    'title': event.get('title', 'Unknown'),
+                    'slug': event.get('slug', ''),
+                    'max_price': max_price,
+                    'liquidity': liquidity,
+                    'end_date': end_date_iso.split('T')[0]
+                })
+        except Exception as e:
+            logging.error(f"Error processing event: {e}")
+            continue
+    
+    # Sort by end date (soonest first)
+    filtered_events.sort(key=lambda x: x['end_date'])
+    
+    if not filtered_events:
+        await update.message.reply_text("No events found ending within 24 hours.")
+        return
+    
+    message = f"⏰ **Events Ending Within 24 Hours** ({len(filtered_events)} found)\n\n"
+    for e in filtered_events[:20]:  # Limit to 20 to avoid message too long
+        message += f"**{e['title']}**\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+        message += f"End Date: {e['end_date']}\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+    
+    if len(filtered_events) > 20:
+        message += f"\n_Showing 20 of {len(filtered_events)} events_"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
 
 
 async def check_new_events(context: ContextTypes.DEFAULT_TYPE):
@@ -474,6 +551,7 @@ def main():
     application.add_handler(CommandHandler("tracking", tracking))
     application.add_handler(CommandHandler("95", cmd_95))
     application.add_handler(CommandHandler("95_1d", cmd_95_1d))
+    application.add_handler(CommandHandler("1d", cmd_1d))
 
 
     # Add Background Job
