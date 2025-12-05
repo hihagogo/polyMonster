@@ -97,6 +97,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
+        "/1h - All events ending within 1 hour\n"
         "/1d - All events ending within 24 hours\n"
         "/1w - All events ending within 7 days\n"
         "/1m - All events ending within 1 month"
@@ -112,6 +113,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
+        "/1h - All events ending within 1 hour\n"
         "/1d - All events ending within 24 hours\n"
         "/1w - All events ending within 7 days\n"
         "/1m - All events ending within 1 month\n"
@@ -377,6 +379,32 @@ def get_events_ending_within(hours):
     filtered_events.sort(key=lambda x: x['end_date'])
     return filtered_events
 
+async def cmd_1h(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds all events ending within 1 hour."""
+    await update.message.reply_text("🔍 Scanning for events ending within 1 hour...")
+    
+    filtered_events = get_events_ending_within(1)
+    
+    if filtered_events is None:
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
+    
+    if not filtered_events:
+        await update.message.reply_text("No events found ending within 1 hour.")
+        return
+    
+    message = f"⚡ **Events Ending Within 1 Hour** ({len(filtered_events)} found)\\n\\n"
+    for e in filtered_events[:20]:  # Limit to 20 to avoid message too long
+        message += f"**{e['title']}**\\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\\n"
+        message += f"End Date: {e['end_date']}\\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\\n\\n"
+    
+    if len(filtered_events) > 20:
+        message += f"\\n_Showing 20 of {len(filtered_events)} events_"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
 async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Finds all events ending within 24 hours."""
     await update.message.reply_text("🔍 Scanning for events ending within 24 hours...")
@@ -626,6 +654,7 @@ def main():
     application.add_handler(CommandHandler("tracking", tracking))
     application.add_handler(CommandHandler("95", cmd_95))
     application.add_handler(CommandHandler("95_1d", cmd_95_1d))
+    application.add_handler(CommandHandler("1h", cmd_1h))
     application.add_handler(CommandHandler("1d", cmd_1d))
     application.add_handler(CommandHandler("1w", cmd_1w))
     application.add_handler(CommandHandler("1m", cmd_1m))
