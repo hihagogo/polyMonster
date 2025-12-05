@@ -340,7 +340,12 @@ def get_events_ending_within(hours):
             if not end_date_iso:
                 continue
             
+            
             end_date = datetime.fromisoformat(end_date_iso.replace('Z', '+00:00'))
+            
+            # Ensure end_date is timezone-aware for comparison
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
             
             # Only include markets ending in the future and within the cutoff
             if now < end_date <= cutoff:
