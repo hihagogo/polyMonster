@@ -97,7 +97,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/tracking - Check Trump event prices and volume\n"
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
-        "/1d - All events ending within 24 hours"
+        "/1d - All events ending within 24 hours\n"
+        "/1w - All events ending within 7 days\n"
+        "/1m - All events ending within 1 month"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,6 +113,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/95 - Find high conviction events (>94% bid, >$500k liq)\n"
         "/95_1d - High conviction events ending within 24 hours\n"
         "/1d - All events ending within 24 hours\n"
+        "/1w - All events ending within 7 days\n"
+        "/1m - All events ending within 1 month\n"
         "/help - Show this command list"
     )
 
@@ -305,11 +309,8 @@ async def cmd_95_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     await update.message.reply_text(message, parse_mode="Markdown")
 
-async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Finds all events ending within 24 hours."""
-    await update.message.reply_text("🔍 Scanning for events ending within 24 hours...")
-    
-    # Fetch events from Polymarket API
+def get_events_ending_within(hours):
+    """Helper function to get events ending within specified hours."""
     try:
         url = "https://gamma-api.polymarket.com/events"
         params = {
@@ -320,13 +321,12 @@ async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
         events = response.json()
     except Exception as e:
         logging.error(f"Error fetching events: {e}")
-        await update.message.reply_text("❌ Failed to fetch events.")
-        return
+        return None
     
-    # Filter for events ending within 24 hours
+    # Filter for events ending within specified hours
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
-    cutoff = now + timedelta(hours=24)
+    cutoff = now + timedelta(hours=hours)
     
     filtered_events = []
     for event in events:
@@ -363,12 +363,75 @@ async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Sort by end date (soonest first)
     filtered_events.sort(key=lambda x: x['end_date'])
+    return filtered_events
+
+async def cmd_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds all events ending within 24 hours."""
+    await update.message.reply_text("🔍 Scanning for events ending within 24 hours...")
+    
+    filtered_events = get_events_ending_within(24)
+    
+    if filtered_events is None:
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
     
     if not filtered_events:
         await update.message.reply_text("No events found ending within 24 hours.")
         return
     
     message = f"⏰ **Events Ending Within 24 Hours** ({len(filtered_events)} found)\n\n"
+    for e in filtered_events[:20]:  # Limit to 20 to avoid message too long
+        message += f"**{e['title']}**\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+        message += f"End Date: {e['end_date']}\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+    
+    if len(filtered_events) > 20:
+        message += f"\n_Showing 20 of {len(filtered_events)} events_"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+async def cmd_1w(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds all events ending within 7 days."""
+    await update.message.reply_text("🔍 Scanning for events ending within 7 days...")
+    
+    filtered_events = get_events_ending_within(24 * 7)  # 7 days = 168 hours
+    
+    if filtered_events is None:
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
+    
+    if not filtered_events:
+        await update.message.reply_text("No events found ending within 7 days.")
+        return
+    
+    message = f"📅 **Events Ending Within 7 Days** ({len(filtered_events)} found)\n\n"
+    for e in filtered_events[:20]:  # Limit to 20 to avoid message too long
+        message += f"**{e['title']}**\n"
+        message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
+        message += f"End Date: {e['end_date']}\n"
+        message += f"[View on Predicts.guru](https://www.predicts.guru/event-analytics/{e['slug']})\n\n"
+    
+    if len(filtered_events) > 20:
+        message += f"\n_Showing 20 of {len(filtered_events)} events_"
+    
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+async def cmd_1m(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Finds all events ending within 1 month."""
+    await update.message.reply_text("🔍 Scanning for events ending within 1 month...")
+    
+    filtered_events = get_events_ending_within(24 * 30)  # 30 days = 720 hours
+    
+    if filtered_events is None:
+        await update.message.reply_text("❌ Failed to fetch events.")
+        return
+    
+    if not filtered_events:
+        await update.message.reply_text("No events found ending within 1 month.")
+        return
+    
+    message = f"📆 **Events Ending Within 1 Month** ({len(filtered_events)} found)\n\n"
     for e in filtered_events[:20]:  # Limit to 20 to avoid message too long
         message += f"**{e['title']}**\n"
         message += f"Price: {e['max_price']:.1%} | Liq: ${e['liquidity']:,.0f}\n"
@@ -552,6 +615,8 @@ def main():
     application.add_handler(CommandHandler("95", cmd_95))
     application.add_handler(CommandHandler("95_1d", cmd_95_1d))
     application.add_handler(CommandHandler("1d", cmd_1d))
+    application.add_handler(CommandHandler("1w", cmd_1w))
+    application.add_handler(CommandHandler("1m", cmd_1m))
 
 
     # Add Background Job
