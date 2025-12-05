@@ -312,36 +312,43 @@ async def cmd_95_1d(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def get_events_ending_within(hours):
     """Helper function to get events ending within specified hours."""
     try:
-        url = "https://gamma-api.polymarket.com/events"
+        # Use /markets endpoint instead of /events because it returns endDateIso for all markets
+        url = "https://gamma-api.polymarket.com/markets"
         params = {
-            "limit": 100,
-            "active": "true"
+            "limit": 1000,  # Increased limit to get more markets
+            "closed": "false"  # Get only open markets
         }
         response = requests.get(url, params=params)
-        events = response.json()
+        markets = response.json()
     except Exception as e:
-        logging.error(f"Error fetching events: {e}")
+        logging.error(f"Error fetching markets: {e}")
         return None
     
-    # Filter for events ending within specified hours
+    # Filter for markets ending within specified hours
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=hours)
     
     filtered_events = []
-    for event in events:
+    for market in markets:
         try:
-            end_date_iso = event.get('endDateIso')
+            # Skip closed markets
+            if market.get('closed'):
+                continue
+            
+            end_date_iso = market.get('endDateIso')
             if not end_date_iso:
                 continue
             
             end_date = datetime.fromisoformat(end_date_iso.replace('Z', '+00:00'))
-            if end_date <= cutoff:
+            
+            # Only include markets ending in the future and within the cutoff
+            if now < end_date <= cutoff:
                 # Get liquidity
-                liquidity = float(event.get('liquidity', 0))
+                liquidity = float(market.get('liquidity', 0))
                 
                 # Get max price across all outcomes
-                outcome_prices = event.get('outcomePrices', '[]')
+                outcome_prices = market.get('outcomePrices', '[]')
                 if isinstance(outcome_prices, str):
                     import json
                     outcome_prices = json.loads(outcome_prices)
@@ -351,14 +358,14 @@ def get_events_ending_within(hours):
                     max_price = max(float(p) for p in outcome_prices)
                 
                 filtered_events.append({
-                    'title': event.get('title', 'Unknown'),
-                    'slug': event.get('slug', ''),
+                    'title': market.get('question', 'Unknown'),  # Use 'question' field for markets
+                    'slug': market.get('slug', ''),
                     'max_price': max_price,
                     'liquidity': liquidity,
                     'end_date': end_date_iso.split('T')[0]
                 })
         except Exception as e:
-            logging.error(f"Error processing event: {e}")
+            logging.error(f"Error processing market: {e}")
             continue
     
     # Sort by end date (soonest first)
